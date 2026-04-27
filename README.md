@@ -22,9 +22,9 @@ That's it. The installer will:
 
 ## What's Inside
 
-### Floki — Your Second Brain (7 skills)
+### Floki — Your Second Brain (8 skills)
 
-Floki turns Claude into a personal knowledge system. It saves what you learn, captures ideas, and lets you search your own notes later. Works with [Obsidian](https://obsidian.md) if you want a visual UI.
+A personal knowledge vault that lives on your computer as plain markdown files. Save what you learn, capture ideas, and search your own notes later — Claude reads and writes to it for you. Works with [Obsidian](https://obsidian.md) if you want a visual UI.
 
 | Skill | What it does |
 |---|---|
@@ -37,12 +37,13 @@ Floki turns Claude into a personal knowledge system. It saves what you learn, ca
 | `/floki-lint` | Audit vault health — find broken links, missing frontmatter, orphan files |
 | `/brief` | Morning briefing — process inbox, summarize tasks, show recent activity |
 
-### Custom Skills (2 skills)
+### Custom Skills (3 skills)
 
 | Skill | What it does |
 |---|---|
 | `/plan` | Create a structured implementation plan with intuitive (non-technical) + technical flow |
 | **`/karpathy`** | **The most important skill.** Activates Andrej Karpathy's 4 principles for disciplined AI coding |
+| `/browser-automation` | Selenium-based persistent Chrome session — launch once, connect from many scripts without re-login |
 
 #### Why `/karpathy` matters
 
@@ -57,7 +58,7 @@ This is the difference between Claude writing 200 lines of over-abstracted code 
 
 ### gstack — AI Engineering Workflow (37 skills)
 
-Installed separately from [garrytan/gstack](https://github.com/garrytan/gstack). These give Claude specialized roles for every stage of building software.
+An open-source toolkit by [Garry Tan](https://github.com/garrytan/gstack) (YC CEO) that gives Claude specialized roles — it can open a real browser to test your app, review code before you ship, run security audits, brainstorm product strategy, and more. Installed automatically by the setup script.
 
 #### Idea & Strategy
 | Skill | What it does |
@@ -84,7 +85,6 @@ Installed separately from [garrytan/gstack](https://github.com/garrytan/gstack).
 | `/open-gstack-browser` | Launch a visible AI-controlled Chromium with a live activity sidebar |
 | `/setup-browser-cookies` | Import cookies from your real Chrome for testing authenticated pages |
 | `/pair-agent` | Give another AI agent scoped access to your browser via a setup key |
-| `/browser-automation` | Selenium persistent Chrome session — launch once, connect from many scripts |
 | `/qa` | Full QA loop — find bugs in a real browser, fix them in code, re-verify |
 | `/qa-only` | Same QA testing but report-only — bug report with screenshots, no fixes |
 | `/benchmark` | Performance regression detection — page load, Core Web Vitals, before/after |
@@ -194,7 +194,7 @@ Skills are symlinked, so `git pull` updates them instantly. The `./setup` re-run
 ```bash
 # Remove VantEdge skills (keeps gstack and your Second Brain)
 rm -rf ~/.claude/skills/vantedge
-for skill in brief dump educate floki-learn floki-lint floki-recall floki-todo idea karpathy plan; do
+for skill in brief dump educate floki-learn floki-lint floki-recall floki-todo idea karpathy plan browser-automation; do
   rm -rf ~/.claude/skills/$skill
 done
 
