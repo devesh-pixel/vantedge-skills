@@ -94,10 +94,26 @@ step 2 "A few quick questions..."
 echo ""
 echo -e "  ${BOLD}What do you want to install?${NC}"
 echo ""
-echo "    1) Everything — gstack + Floki (Second Brain) + custom skills"
-echo "    2) gstack + custom skills only (no Second Brain)"
-echo "    3) Floki (Second Brain) + custom skills only (no gstack)"
-echo "    4) Custom skills only"
+echo -e "  Here's what each piece does:"
+echo ""
+echo -e "    ${BOLD}gstack${NC} ${DIM}(by Garry Tan, YC CEO)${NC}"
+echo -e "    An AI engineering toolkit. Gives Claude superpowers: it can open a real"
+echo -e "    browser to QA-test your app, review your code before you ship, run security"
+echo -e "    audits, brainstorm product ideas, and more. 37 skills total."
+echo ""
+echo -e "    ${BOLD}Floki${NC} ${DIM}(Second Brain)${NC}"
+echo -e "    Your personal knowledge vault. Save things you learn, capture ideas, and"
+echo -e "    search your own notes later. Just markdown files — works with Obsidian or"
+echo -e "    any text editor. Claude reads and writes to it for you."
+echo ""
+echo -e "    ${BOLD}Custom skills${NC}"
+echo -e "    VantEdge-specific tools: /plan for structured planning, /educate to explain"
+echo -e "    code in plain English, /karpathy for disciplined coding mode."
+echo ""
+echo "    1) Everything — gstack + Floki + custom skills (recommended)"
+echo "    2) gstack + custom skills (skip the Second Brain)"
+echo "    3) Floki + custom skills (skip the engineering tools)"
+echo "    4) Custom skills only (minimal install)"
 echo ""
 ask "Choose" "1" INSTALL_CHOICE
 
@@ -115,21 +131,35 @@ esac
 INSTALL_SOUNDS=n
 if [ "$INSTALL_GSTACK" -eq 1 ] || [ "$INSTALL_SKILLS" -eq 1 ]; then
   echo ""
-  ask_yn "Add sound notifications? (plays a sound when Claude needs your attention)" "y" INSTALL_SOUNDS
+  echo -e "  ${BOLD}Sound notifications${NC}"
+  echo -e "  ${DIM}Claude sometimes pauses to ask you a question or request permission."
+  echo -e "  With sounds on, you'll hear a chime so you don't have to keep watching.${NC}"
+  echo -e "  ${DIM}  Pop sound  = Claude finished working"
+  echo -e "  Funk sound = Claude needs your attention${NC}"
+  echo ""
+  ask_yn "Enable sound notifications?" "y" INSTALL_SOUNDS
 fi
 
 FLOKI_PATH="$SECOND_BRAIN"
 if [ "$INSTALL_FLOKI" -eq 1 ]; then
   echo ""
-  ask "Where should your Second Brain vault live?" "$SECOND_BRAIN" FLOKI_PATH
+  echo -e "  ${BOLD}Second Brain location${NC}"
+  echo -e "  ${DIM}This is a folder on your computer where Floki stores your notes, ideas,"
+  echo -e "  and learnings. It's just markdown files — you can open it in Obsidian,"
+  echo -e "  VS Code, or any text editor.${NC}"
+  echo ""
+  ask "Where should it live?" "$SECOND_BRAIN" FLOKI_PATH
 fi
 
 SKILL_PREFIX=0
 if [ "$INSTALL_GSTACK" -eq 1 ]; then
   echo ""
-  echo -e "  ${BOLD}Skill naming style:${NC}"
+  echo -e "  ${BOLD}Skill naming${NC}"
+  echo -e "  ${DIM}Skills are slash commands you type in Claude Code (like /qa or /ship)."
+  echo -e "  You can use short names or add a prefix to avoid conflicts with other tools.${NC}"
+  echo ""
   echo "    1) Short — /qa, /ship, /review (recommended)"
-  echo "    2) Namespaced — /gstack-qa, /gstack-ship, /gstack-review"
+  echo "    2) Prefixed — /gstack-qa, /gstack-ship, /gstack-review"
   echo ""
   ask "Choose" "1" NAMING_CHOICE
   case "$NAMING_CHOICE" in
