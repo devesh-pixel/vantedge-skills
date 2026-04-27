@@ -1,0 +1,374 @@
+#!/usr/bin/env bash
+# VantEdge Skills — one-command setup for gstack + Floki + custom skills
+set -e
+
+# ─── Colors ───────────────────────────────────────────────────
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m'
+
+VANTEDGE_DIR="$(cd "$(dirname "$0")" && pwd)"
+CLAUDE_DIR="$HOME/.claude"
+SKILLS_DIR="$CLAUDE_DIR/skills"
+GSTACK_DIR="$SKILLS_DIR/gstack"
+SECOND_BRAIN="$HOME/SecondBrain"
+
+# ─── Helpers ──────────────────────────────────────────────────
+step() { echo -e "\n${BLUE}[$1/$TOTAL_STEPS]${NC} ${BOLD}$2${NC}"; }
+ok()   { echo -e "  ${GREEN}✓${NC} $1"; }
+warn() { echo -e "  ${YELLOW}!${NC} $1"; }
+fail() { echo -e "  ${RED}✗${NC} $1"; }
+ask()  {
+  local prompt="$1" default="$2" var="$3"
+  if [ -t 0 ]; then
+    printf "  ${BOLD}%s${NC} ${DIM}(%s)${NC} " "$prompt" "$default"
+    read -r _answer </dev/tty 2>/dev/null || _answer=""
+    eval "$var=\"${_answer:-$default}\""
+  else
+    eval "$var=\"$default\""
+  fi
+}
+ask_yn() {
+  local prompt="$1" default="$2" var="$3"
+  if [ -t 0 ]; then
+    if [ "$default" = "y" ]; then
+      printf "  ${BOLD}%s${NC} ${DIM}[Y/n]${NC} " "$prompt"
+    else
+      printf "  ${BOLD}%s${NC} ${DIM}[y/N]${NC} " "$prompt"
+    fi
+    read -r _answer </dev/tty 2>/dev/null || _answer=""
+    _answer="${_answer:-$default}"
+    case "$_answer" in
+      [yY]*) eval "$var=y" ;;
+      *)     eval "$var=n" ;;
+    esac
+  else
+    eval "$var=\"$default\""
+  fi
+}
+
+# ─── Welcome ──────────────────────────────────────────────────
+echo ""
+echo -e "${BOLD}╔══════════════════════════════════════════════╗${NC}"
+echo -e "${BOLD}║       VantEdge AI — Development Tools        ║${NC}"
+echo -e "${BOLD}╚══════════════════════════════════════════════╝${NC}"
+echo ""
+echo -e "  This will set up your AI-powered development environment."
+echo -e "  It takes about 2 minutes. You'll be asked a few questions."
+echo ""
+
+# ─── Pre-flight checks ───────────────────────────────────────
+TOTAL_STEPS=6
+step 1 "Checking your system..."
+
+if ! command -v git >/dev/null 2>&1; then
+  fail "git is not installed. Please install git first."
+  echo "    macOS: xcode-select --install"
+  echo "    Linux: sudo apt install git"
+  exit 1
+fi
+ok "git found"
+
+HAS_BUN=0
+if command -v bun >/dev/null 2>&1; then
+  HAS_BUN=1
+  ok "bun found ($(bun --version))"
+else
+  warn "bun not found — gstack needs it for the browser engine"
+  echo -e "    ${DIM}Install: curl -fsSL https://bun.sh/install | bash${NC}"
+fi
+
+if command -v claude >/dev/null 2>&1; then
+  ok "Claude Code found"
+else
+  warn "Claude Code CLI not detected (that's fine if you use the desktop app)"
+fi
+
+# ─── Questions ────────────────────────────────────────────────
+step 2 "A few quick questions..."
+
+echo ""
+echo -e "  ${BOLD}What do you want to install?${NC}"
+echo ""
+echo "    1) Everything — gstack + Floki (Second Brain) + custom skills"
+echo "    2) gstack + custom skills only (no Second Brain)"
+echo "    3) Floki (Second Brain) + custom skills only (no gstack)"
+echo "    4) Custom skills only"
+echo ""
+ask "Choose" "1" INSTALL_CHOICE
+
+INSTALL_GSTACK=0
+INSTALL_FLOKI=0
+INSTALL_SKILLS=1
+case "$INSTALL_CHOICE" in
+  1) INSTALL_GSTACK=1; INSTALL_FLOKI=1 ;;
+  2) INSTALL_GSTACK=1 ;;
+  3) INSTALL_FLOKI=1 ;;
+  4) ;;
+  *) INSTALL_GSTACK=1; INSTALL_FLOKI=1 ;;
+esac
+
+INSTALL_SOUNDS=n
+if [ "$INSTALL_GSTACK" -eq 1 ] || [ "$INSTALL_SKILLS" -eq 1 ]; then
+  echo ""
+  ask_yn "Add sound notifications? (plays a sound when Claude needs your attention)" "y" INSTALL_SOUNDS
+fi
+
+FLOKI_PATH="$SECOND_BRAIN"
+if [ "$INSTALL_FLOKI" -eq 1 ]; then
+  echo ""
+  ask "Where should your Second Brain vault live?" "$SECOND_BRAIN" FLOKI_PATH
+fi
+
+SKILL_PREFIX=0
+if [ "$INSTALL_GSTACK" -eq 1 ]; then
+  echo ""
+  echo -e "  ${BOLD}Skill naming style:${NC}"
+  echo "    1) Short — /qa, /ship, /review (recommended)"
+  echo "    2) Namespaced — /gstack-qa, /gstack-ship, /gstack-review"
+  echo ""
+  ask "Choose" "1" NAMING_CHOICE
+  case "$NAMING_CHOICE" in
+    2) SKILL_PREFIX=1 ;;
+    *) SKILL_PREFIX=0 ;;
+  esac
+fi
+
+# ─── Install gstack ──────────────────────────────────────────
+if [ "$INSTALL_GSTACK" -eq 1 ]; then
+  step 3 "Installing gstack (AI engineering workflow)..."
+
+  mkdir -p "$SKILLS_DIR"
+
+  if [ -d "$GSTACK_DIR/.git" ]; then
+    ok "gstack already installed, updating..."
+    (cd "$GSTACK_DIR" && git pull --ff-only 2>/dev/null) || warn "couldn't update gstack (offline?)"
+  elif [ -d "$GSTACK_DIR" ] && [ ! -d "$GSTACK_DIR/.git" ]; then
+    ok "gstack directory exists (symlinked or manually installed)"
+  else
+    echo -e "  ${DIM}Cloning gstack...${NC}"
+    git clone --single-branch --depth 1 https://github.com/garrytan/gstack.git "$GSTACK_DIR"
+    ok "gstack cloned"
+  fi
+
+  if [ "$HAS_BUN" -eq 1 ] && [ -d "$GSTACK_DIR/.git" ]; then
+    echo -e "  ${DIM}Running gstack setup...${NC}"
+    SETUP_FLAGS="--quiet"
+    if [ "$SKILL_PREFIX" -eq 1 ]; then
+      SETUP_FLAGS="$SETUP_FLAGS --prefix"
+    else
+      SETUP_FLAGS="$SETUP_FLAGS --no-prefix"
+    fi
+    (cd "$GSTACK_DIR" && ./setup $SETUP_FLAGS) && ok "gstack setup complete" || warn "gstack setup had warnings (may need bun)"
+  elif [ "$HAS_BUN" -eq 0 ]; then
+    warn "Skipping gstack build (bun not installed)"
+    echo -e "    ${DIM}After installing bun, run: cd $GSTACK_DIR && ./setup${NC}"
+  fi
+else
+  step 3 "Skipping gstack (not selected)..."
+  ok "skipped"
+fi
+
+# ─── Install Floki (Second Brain) ────────────────────────────
+if [ "$INSTALL_FLOKI" -eq 1 ]; then
+  step 4 "Setting up Floki (your Second Brain)..."
+
+  if [ -d "$FLOKI_PATH/_schema" ]; then
+    ok "Vault already exists at $FLOKI_PATH"
+    echo -e "  ${DIM}Checking for missing folders...${NC}"
+    for dir in 000-inbox 000-raw daily finance ideas learning projects todos tools; do
+      if [ ! -d "$FLOKI_PATH/$dir" ]; then
+        mkdir -p "$FLOKI_PATH/$dir"
+        ok "created $dir/"
+      fi
+    done
+    for schema_file in categories.md frontmatter.md linking-rules.md; do
+      if [ ! -f "$FLOKI_PATH/_schema/$schema_file" ]; then
+        cp "$VANTEDGE_DIR/floki-scaffold/_schema/$schema_file" "$FLOKI_PATH/_schema/$schema_file"
+        ok "added _schema/$schema_file"
+      fi
+    done
+  else
+    echo -e "  ${DIM}Creating vault at $FLOKI_PATH...${NC}"
+    mkdir -p "$FLOKI_PATH"
+
+    cp -r "$VANTEDGE_DIR/floki-scaffold/_schema" "$FLOKI_PATH/_schema"
+    cp -r "$VANTEDGE_DIR/floki-scaffold/_templates" "$FLOKI_PATH/_templates"
+    for dir in 000-inbox 000-raw daily finance ideas learning projects todos tools; do
+      mkdir -p "$FLOKI_PATH/$dir"
+    done
+
+    # Create initial tasks file
+    cat > "$FLOKI_PATH/todos/tasks.md" << 'TASKS'
+---
+type: todo
+created: $(date +%Y-%m-%d)
+tags: [tasks]
+---
+
+# Tasks
+
+## Active
+
+- [ ] Explore the Second Brain — try /dump, /idea, /recall
+
+## Completed
+TASKS
+
+    ok "vault created at $FLOKI_PATH"
+  fi
+
+  # Update skill files to point to the right vault path
+  if [ "$FLOKI_PATH" != "$HOME/SecondBrain" ]; then
+    echo -e "  ${DIM}Updating vault path in skills...${NC}"
+    for skill_file in "$VANTEDGE_DIR"/skills/*/SKILL.md; do
+      if grep -q "~/SecondBrain" "$skill_file" 2>/dev/null; then
+        sed -i.bak "s|~/SecondBrain|$FLOKI_PATH|g" "$skill_file" && rm -f "$skill_file.bak"
+      fi
+    done
+    ok "skills point to $FLOKI_PATH"
+  fi
+else
+  step 4 "Skipping Floki (not selected)..."
+  ok "skipped"
+fi
+
+# ─── Install custom skills ───────────────────────────────────
+step 5 "Installing VantEdge skills..."
+
+mkdir -p "$SKILLS_DIR"
+
+INSTALLED_SKILLS=()
+for skill_dir in "$VANTEDGE_DIR"/skills/*/; do
+  skill_name="$(basename "$skill_dir")"
+  [ -f "$skill_dir/SKILL.md" ] || continue
+
+  # Skip Floki skills if Floki wasn't selected
+  if [ "$INSTALL_FLOKI" -eq 0 ]; then
+    case "$skill_name" in
+      brief|dump|floki-learn|floki-lint|floki-recall|floki-todo|idea) continue ;;
+    esac
+  fi
+
+  target="$SKILLS_DIR/$skill_name"
+  mkdir -p "$target"
+
+  # Symlink SKILL.md back to this repo so git pull updates everything
+  if [ -L "$target/SKILL.md" ]; then rm "$target/SKILL.md"; fi
+  ln -snf "$skill_dir/SKILL.md" "$target/SKILL.md"
+  INSTALLED_SKILLS+=("$skill_name")
+done
+
+if [ ${#INSTALLED_SKILLS[@]} -gt 0 ]; then
+  ok "installed ${#INSTALLED_SKILLS[@]} skills: ${INSTALLED_SKILLS[*]}"
+else
+  warn "no skills installed"
+fi
+
+# ─── Configure hooks ─────────────────────────────────────────
+step 6 "Configuring environment..."
+
+if [ "$INSTALL_SOUNDS" = "y" ]; then
+  SETTINGS_FILE="$CLAUDE_DIR/settings.json"
+
+  if [ -f "$SETTINGS_FILE" ]; then
+    # Check if hooks already exist
+    if grep -q '"Stop"' "$SETTINGS_FILE" 2>/dev/null; then
+      ok "sound hooks already configured"
+    else
+      warn "settings.json exists — add sounds manually or run /update-config in Claude"
+      echo -e "    ${DIM}Sounds: Pop on finish, Funk on permission/question${NC}"
+    fi
+  else
+    mkdir -p "$CLAUDE_DIR"
+    cat > "$SETTINGS_FILE" << 'SETTINGS'
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "afplay /System/Library/Sounds/Pop.aiff",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "afplay /System/Library/Sounds/Funk.aiff",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Elicitation": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "afplay /System/Library/Sounds/Funk.aiff",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "afplay /System/Library/Sounds/Funk.aiff",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}
+SETTINGS
+    ok "sound notifications configured"
+    echo -e "    ${DIM}Pop = Claude finished, Funk = needs your attention${NC}"
+  fi
+fi
+
+# ─── Done ─────────────────────────────────────────────────────
+echo ""
+echo -e "${BOLD}╔══════════════════════════════════════════════╗${NC}"
+echo -e "${BOLD}║              Setup complete!                  ║${NC}"
+echo -e "${BOLD}╚══════════════════════════════════════════════╝${NC}"
+echo ""
+
+echo -e "  ${BOLD}What was installed:${NC}"
+[ "$INSTALL_GSTACK" -eq 1 ] && echo -e "    ${GREEN}✓${NC} gstack — 37 AI engineering skills (/qa, /ship, /review, /browse...)"
+[ "$INSTALL_FLOKI" -eq 1 ]  && echo -e "    ${GREEN}✓${NC} Floki — Second Brain at ${BOLD}$FLOKI_PATH${NC}"
+[ "$INSTALL_SKILLS" -eq 1 ] && echo -e "    ${GREEN}✓${NC} VantEdge skills — ${#INSTALLED_SKILLS[@]} custom skills"
+[ "$INSTALL_SOUNDS" = "y" ] && echo -e "    ${GREEN}✓${NC} Sound notifications"
+
+echo ""
+echo -e "  ${BOLD}Try these in Claude Code:${NC}"
+[ "$INSTALL_GSTACK" -eq 1 ] && echo "    /qa              — QA test your app"
+[ "$INSTALL_GSTACK" -eq 1 ] && echo "    /ship            — ship your code"
+[ "$INSTALL_GSTACK" -eq 1 ] && echo "    /office-hours    — brainstorm an idea"
+echo "    /plan            — plan a feature"
+echo "    /educate         — explain code in plain english"
+[ "$INSTALL_FLOKI" -eq 1 ]  && echo "    /dump            — save anything to your Second Brain"
+[ "$INSTALL_FLOKI" -eq 1 ]  && echo "    /idea            — flesh out a product idea"
+[ "$INSTALL_FLOKI" -eq 1 ]  && echo "    /floki-recall    — search your Second Brain"
+[ "$INSTALL_FLOKI" -eq 1 ]  && echo "    /brief           — morning briefing"
+echo ""
+echo -e "  ${BOLD}To update later:${NC}"
+echo "    cd $VANTEDGE_DIR && git pull && ./setup"
+echo ""
