@@ -42,7 +42,18 @@ Floki turns Claude into a personal knowledge system. It saves what you learn, ca
 | Skill | What it does |
 |---|---|
 | `/plan` | Create a structured implementation plan with intuitive (non-technical) + technical flow |
-| `/karpathy` | Activate Karpathy's 4 principles for disciplined coding — anti-vibecoding mode |
+| **`/karpathy`** | **The most important skill.** Activates Andrej Karpathy's 4 principles for disciplined AI coding |
+
+#### Why `/karpathy` matters
+
+Without it, Claude tends to over-engineer, guess when it's unsure, add features you didn't ask for, and "improve" code it shouldn't be touching. `/karpathy` fixes all of that. Run it at the start of any serious task and Claude will:
+
+1. **Think before coding** — state assumptions, ask when unsure, push back if a simpler approach exists
+2. **Simplicity first** — minimum code that solves the problem, no speculative features, no abstractions for single-use code
+3. **Surgical changes** — touch only what it must, don't "improve" adjacent code
+4. **Goal-driven** — show what changed, prove the goal was met, no unnecessary output
+
+This is the difference between Claude writing 200 lines of over-abstracted code vs. 50 clean lines that do the job.
 
 ### gstack — AI Engineering Workflow (37 skills)
 
